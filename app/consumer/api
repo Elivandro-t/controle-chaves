@@ -1,0 +1,233 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+// 1. Hooks nativos da Vision Camera
+import { useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
+// 2. IMPORTAÇÃO BLINDADA: Forçamos a Câmera como 'any' para aceitar photo={true} sem reclamar
+import { Camera as DetectorCamera, Face } from 'react-native-vision-camera-face-detector';
+import { detlhesFacial } from '../../services/api';
+
+const Camera = DetectorCamera as any;
+
+export default function DetalhesFacialItens() {
+  const router = useRouter();
+  const dimensions = useWindowDimensions();
+  
+  // Hook oficial para pegar o status e a função de pedir permissão da câmera
+  const { hasPermission, requestPermission } = useCameraPermission();
+  
+  // Hook para capturar o hardware da câmera frontal nativa
+  const device = useCameraDevice('front');
+  const cameraRef = useRef<any>(null);
+  
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [imagemFacial, setImagemFacial] = useState('');
+  const [usuario, setUsuario] = useState<any>(null);
+  
+  // Estados para gerenciar o feedback do rosto e o cronômetro
+  const [hasFace, setHasFace] = useState(false);
+  const [countdown, setCountdown] = useState(1.5);
+  
+  // Refs para monitorar os timers evitando re-renderizações infinitas
+  const faceDetectedRef = useRef(false);
+  const countdownIntervalRef = useRef<NodeJS.Timeout | any>(null);
+  const captureTimeoutRef = useRef<NodeJS.Timeout | any>(null);
+
+  // Limpeza global de timers ativos
+  const limparTimers = useCallback(() => {
+    if (captureTimeoutRef.current) clearTimeout(captureTimeoutRef.current);
+    if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+    captureTimeoutRef.current = null;
+    countdownIntervalRef.current = null;
+  }, []);
+
+  // Solicitação de permissão nativa reativa utilizando os novos hooks
+  async function abrirCamera() {
+    if (!hasPermission) {
+      const granted = await requestPermission();
+      if (!granted) {
+        Alert.alert("Permissão necessária", "Libere o acesso à câmera nas configurações do sistema.");
+        return;
+      }
+    }
+    
+    setCameraOpen(true);
+    setUsuario(null);
+    setImagemFacial('');
+    setHasFace(false);
+    setCountdown(1.5);
+    faceDetectedRef.current = false;
+  }
+
+  // Captura automática da foto e envio em formato Base64 para a API
+  const capturarFotoAutomatica = useCallback(async () => {
+    try {
+      if (!cameraRef.current) return;
+
+      const foto = await cameraRef.current.takePhoto({
+        flash: 'off',
+        enableShutterSound: false,
+      });
+
+      // Conversão do arquivo temporário local para a string Base64 necessária na API existente
+      const respostaLocal = await fetch(`file://${foto.path}`);
+      const blob = await respostaLocal.blob();
+      
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64String = reader.result as string;
+        setImagemFacial(base64String);
+        setCameraOpen(false);
+        limparTimers();
+        await reconhecerFace(base64String);
+      };
+      reader.readAsDataURL(blob);
+
+    } catch (error) {
+      console.log(error);
+      Alert.alert("Erro", "Erro ao capturar rosto");
+      setCameraOpen(false);
+      limparTimers();
+    }
+  }, [limparTimers]);
+
+  // Método unificado que intercepta os frames e gerencia a contagem regressiva inteligente
+  const handleFacesDetected = useCallback((faces: Face[]) => {
+    const detected = faces.length > 0;
+    
+    if (detected !== faceDetectedRef.current) {
+      faceDetectedRef.current = detected;
+      setHasFace(detected);
+
+      if (detected) {
+        setCountdown(1.5);
+        
+        countdownIntervalRef.current = setInterval(() => {
+          setCountdown((prev) => (prev > 0.5 ? prev - 0.5 : 0));
+        }, 500);
+
+        captureTimeoutRef.current = setTimeout(() => {
+          capturarFotoAutomatica();
+        }, 1500);
+      } else {
+        limparTimers();
+      }
+    }
+  }, [capturarFotoAutomatica, limparTimers]);
+
+  async function reconhecerFace(imagem: string) {
+    try {
+      setLoading(true);
+      const data = await detlhesFacial(imagem as any);
+      setUsuario(data);
+    } catch (error: any) {
+      console.log(error);
+      Alert.alert("Erro", "Usuário não reconhecido");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    return () => limparTimers();
+  }, [limparTimers]);
+
+  // Fluxo de renderização da câmera aberta em tela cheia
+  if (cameraOpen) {
+    if (device == null) {
+      return (
+        <View style={styles.center}>
+          <Text>Carregando hardware da câmera...</Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={{ flex: 1, backgroundColor: '#000' }}>
+        {/* Componente agora aceita photo e faceDetectionCallback perfeitamente */}
+        <Camera
+          ref={cameraRef}
+          style={StyleSheet.absoluteFill}
+          device={device}
+          isActive={true}
+          photo={true} 
+          faceDetectionCallback={handleFacesDetected}
+          faceDetectionOptions={{
+            performanceMode: 'fast',
+            runClassifications: false,
+            runLandmarks: false,
+            runContours: false,
+            cameraFacing: 'front',
+            windowHeight: dimensions.height,
+            windowWidth: dimensions.width,
+          }}
+        />
+
+        {/* Feedback visual de enquadramento da biometria */}
+        <View style={styles.overlayContainer}>
+          <View style={[
+            styles.mascaraRosto, 
+            { borderColor: hasFace ? '#22c55e' : '#ef4444' }
+          ]} />
+
+          <View style={styles.captureStatus}>
+            <Text style={styles.buttonText}>
+              {hasFace 
+                ? `Rosto detectado! Capturando em ${countdown.toFixed(1)}s...` 
+                : "Posicione seu rosto dentro da área..."
+              }
+            </Text>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  // Dashboard Inicial padrão (Sem Câmera ativa)
+  return (
+    <ScrollView style={styles.page} contentContainerStyle={styles.content}>
+      <Pressable onPress={() => router.back()}>
+        <MaterialCommunityIcons name="chevron-left" size={30} color="#0a7ea4" />
+      </Pressable>
+      
+      <Text style={styles.title}>Reconhecimento Facial</Text>
+      
+      <Pressable style={styles.button} onPress={abrirCamera}>
+        <Text style={styles.buttonText}>
+          {imagemFacial ? "Reconhecer novamente" : "Capturar Face"}
+        </Text>
+      </Pressable>
+      
+      {loading && <ActivityIndicator size="large" color="#0a7ea4" />}
+      
+      {usuario && (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Usuário encontrado</Text>
+          <Text>id: {usuario?.id}</Text>
+          <Text>Nome: {usuario.nome}</Text>
+          <Text>Matrícula: {usuario.matricula}</Text>
+          <Text>GMCore ID: {usuario.gmcoreId}</Text>
+          <Text>Setor: {usuario.setor}</Text>
+          <Text>Filial: {usuario.filial}</Text>
+          <Text>Status: {usuario.ativo ? " Ativo" : " Inativo"}</Text>
+        </View>
+      )}
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  page: { flex: 1, backgroundColor: '#f0f9ff' },
+  content: { padding: 20, gap: 20 },
+  title: { fontSize: 25, fontWeight: 'bold' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  button: { backgroundColor: '#0a7ea4', padding: 15, borderRadius: 10, alignItems: 'center' },
+  buttonText: { color: '#fff', fontWeight: 'bold', textAlign: 'center' },
+  overlayContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'transparent' },
+  mascaraRosto: { width: 260, height: 340, borderRadius: 130, borderWidth: 4, backgroundColor: 'transparent', marginBottom: 40 },
+  captureStatus: { position: 'absolute', bottom: 50, left: 30, right: 30, backgroundColor: 'rgba(0,0,0,0.7)', padding: 18, borderRadius: 15, alignItems: 'center' },
+  card: { backgroundColor: '#fff', padding: 20, borderRadius: 15, gap: 8, borderWidth: 1, borderColor: '#ddd' },
+  cardTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 10 },
+});
