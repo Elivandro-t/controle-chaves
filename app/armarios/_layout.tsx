@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function Layout() {
   const router = useRouter();
@@ -26,12 +27,13 @@ export default function Layout() {
     }
     carregarFilial();
   }, []);
-
+const insets = useSafeAreaInsets();
   return (
     <Stack
       screenOptions={{
         headerStyle: {
-          backgroundColor: '#f0f9ff', // Light mode corporativo
+          backgroundColor: '#f0f9ff', 
+          // Light mode corporativo
         },
         headerTintColor: '#0f172a', // Texto/Ícone escuro para contraste
         headerTitleAlign: 'left',
@@ -40,7 +42,7 @@ export default function Layout() {
           if (semVoltar === "true") {
             return (
                <TouchableOpacity
-            style={{ marginRight: 15 }}
+            style={{ marginTop: 15 }}
             onPress={() => router.canGoBack() ? router.back() : router.replace('/filial')}
           >
             <Ionicons name="arrow-back-circle-outline" size={32} color="#0f172a" />

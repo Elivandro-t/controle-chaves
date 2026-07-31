@@ -3,20 +3,18 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { Fragment, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert, Animated, Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View
 } from 'react-native';
 import { ArmariodTop3UltimosEntregue, setOnSessionExpired } from '../../services/api';
 import { showError } from '../../services/toast';
 
-// Adicionada a propriedade 'permissoesExigidas' em cada action conforme sua regra
 const actions = [
   {
     label: 'Entregar Chave',
@@ -59,14 +57,6 @@ const actions = [
     permissoesExigidas: ['REGISTRO_CRIADO'],
   },
   {
-    label: 'Histórico',
-    color: '#E0F2FE',
-    textColor: '#0369A1',
-    icon: 'history',
-    rota: 'historico',
-    permissoesExigidas: ['VISUALIZAR_REGISTRO'],
-  },
-  {
     label: 'Totem',
     color: '#CCFBF1',
     textColor: '#0F766E',
@@ -81,31 +71,62 @@ export default function HomeScreen() {
   const [filialNum, setFilialNum] = useState<number | null>(null);
   const [selectedArm, setSelectedArm] = useState<any>(null);
   const [permissao, setPermissao] = useState<string[]>([]);
-  const [horaHeader, setHoraHeader] = useState("")
+  const [horaHeader, setHoraHeader] = useState("");
+
   const dataHeader = new Date().toLocaleDateString('pt-BR', {
     weekday: 'long',
     day: '2-digit',
     month: 'long',
-  }).toUpperCase();;
+  }).toUpperCase();
+
   const buscaData = () => {
     const data = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-    setHoraHeader(data)
-  }
+    setHoraHeader(data);
+  };
+
   useEffect(() => {
     const interval = setInterval(buscaData, 1000);
-
     return () => clearInterval(interval);
-  }, [])
-  // Monitor de expiração de sessão
-  useEffect(() => {
-    const unsubscribe = setOnSessionExpired(() => showError('Sessão expirada', 'Faça login novamente'));
-    return unsubscribe;
   }, []);
+
+  // Monitor de expiração de sessão com redirecionamento seguro para o login
+  useEffect(() => {
+    setOnSessionExpired(async () => {
+      try {
+        await AsyncStorage.removeItem("authToken");
+        await AsyncStorage.removeItem("selectedFilial");
+        await AsyncStorage.removeItem("selectedArm");
+      } catch (e) {
+        console.error('Erro ao limpar storage na expiração:', e);
+      }
+
+      showError('Sessão expirada', 'Faça login novamente');
+      
+      // Utiliza router.replace para garantir compatibilidade com o Expo Router
+      router.replace('/login');
+    });
+  }, [router]);
 
   // Resgate seguro da filial do Storage e Token
   useEffect(() => {
     async function inicializarDados() {
       try {
+        const token = await AsyncStorage.getItem('authToken');
+        if (!token) {
+          router.replace('/login');
+          return;
+        }
+
+        const payload = await descriptogradaToken();
+        if (!payload) {
+          router.replace('/login');
+          return;
+        }
+
+        if (Array.isArray(payload?.permissoes)) {
+          setPermissao(payload.permissoes);
+        }
+
         const idSalvo = await AsyncStorage.getItem('selectedFilial');
         if (!idSalvo || idSalvo.trim() === '') {
           router.replace('/filial');
@@ -116,25 +137,21 @@ export default function HomeScreen() {
           router.replace('/filial');
           return;
         }
-        setFilialNum(idSalvo as any);
+        setFilialNum(parsedId);
 
         const dataArm = await AsyncStorage.getItem("selectedArm");
         if (dataArm) {
           setSelectedArm(JSON.parse(dataArm));
         }
-
-        const payload = await descriptogradaToken();
-        if (payload != null && Array.isArray(payload?.permissoes)) {
-          setPermissao(payload.permissoes);
-        }
       } catch (err) {
         console.error('Erro ao ler AsyncStorage/Token na Home:', err);
-        router.replace('/filial');
+        router.replace('/login');
       }
     }
 
     inicializarDados();
   }, [router]);
+
   const scale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -152,14 +169,13 @@ export default function HomeScreen() {
         }),
       ])
     ).start();
-  }, []);
-  // Função para verificar se o usuário possui todas as permissões exigidas pela ação
+  }, [scale]);
+
   const temPermissao = (permissoesExigidas: string[] = []) => {
     if (!permissao || permissao.length === 0) return false;
     return permissoesExigidas.every(p => permissao.includes(p));
   };
 
-  // As consultas do React Query aguardam o filialNum ser preenchido de fato
   const { data: armario = [] } = useQuery<any[]>({
     queryKey: ['Top3UltimosFilial', filialNum],
     queryFn: () => ArmariodTop3UltimosEntregue(116),
@@ -168,7 +184,6 @@ export default function HomeScreen() {
   });
 
   const handleActionPress = (action: any) => {
-    // Validação extra no clique caso o botão esteja visível mas desativado por regra de segurança
     if (!temPermissao(action.permissoesExigidas)) {
       Alert.alert('Acesso Negado', 'Você não possui permissão para executar esta ação.');
       return;
@@ -176,7 +191,7 @@ export default function HomeScreen() {
 
     const rota = action.rota;
     if (rota === 'entregar') return router.push('/entregar');
-    if (rota === 'consumer') return router.push('/consumer/create');
+    if (rota === 'consumer') return router.push('/consumer/ListUsersScreen');
     if (rota === "filiais-armarios") {
       return router.push({
         pathname: "/armarios/ArmariosScreen",
@@ -203,7 +218,6 @@ export default function HomeScreen() {
     Alert.alert(rota, 'Funcionalidade em breve.');
   };
 
-  // Previne carregamento incorreto enquanto a filial não é lida
   if (filialNum === null) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0f9ff' }]}>
@@ -214,16 +228,12 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      {/* HEADER PREMIUM LIGHT */}
       <View style={styles.header}>
         <View style={styles.headerTopRow}>
           <View>
             <Text style={styles.headerTitle}>Controle de Chaves</Text>
             <Text style={styles.headerSubtitle}>Portaria Principal • Filial {filialNum}</Text>
           </View>
-          <TouchableOpacity style={styles.notificationIcon} activeOpacity={0.6}>
-            <MaterialCommunityIcons name="bell-outline" size={18} color="#64748b" />
-          </TouchableOpacity>
         </View>
 
         <View style={styles.headerTimeContainer}>
@@ -233,7 +243,6 @@ export default function HomeScreen() {
       </View>
 
       <ScrollView style={styles.page} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* AÇÕES PRINCIPAIS */}
         <Text style={styles.sectionTitle}>AÇÕES RÁPIDAS</Text>
 
         <View style={styles.mainActionsRow}>
@@ -241,14 +250,12 @@ export default function HomeScreen() {
             const autorizado = temPermissao(action.permissoesExigidas);
 
             return (
-              <>
-                {autorizado
-                  &&
+              <Fragment key={action.label}>
+                {autorizado && (
                   <Pressable
-                    key={action.label}
                     style={({ pressed }) => [
                       styles.mainActionCard,
-                      { backgroundColor: action.color, opacity: pressed && autorizado ? 0.85 : autorizado ? 1 : 0.4 },
+                      { backgroundColor: action.color, opacity: pressed ? 0.85 : 1 },
                     ]}
                     onPress={() => handleActionPress(action)}
                   >
@@ -259,33 +266,25 @@ export default function HomeScreen() {
                       style={{ marginBottom: 6 }}
                     />
                     <Text style={[styles.actionText, { color: action.textColor }]}>{action.label}</Text>
-                    {!autorizado && (
-                      <MaterialCommunityIcons name="lock" size={14} color={action.textColor} style={{ marginTop: 4 }} />
-                    )}
                   </Pressable>
-
-                }
-
-              </>
+                )}
+              </Fragment>
             );
           })}
         </View>
 
-        {/* AÇÕES SECUNDÁRIAS */}
         <ScrollView style={{ padding: 5 }}>
           <View style={styles.secondaryActionsRow}>
             {actions.slice(2).map((action) => {
               const autorizado = temPermissao(action.permissoesExigidas);
 
               return (
-                <>
-                  {autorizado &&
-
+                <View key={action.label} style={{ flex: 1 }}>
+                  {autorizado && (
                     <Pressable
-                      key={action.label}
                       style={({ pressed }) => [
                         styles.secondaryActionCard,
-                        { backgroundColor: action.color, opacity: pressed && autorizado ? 0.85 : autorizado ? 1 : 0.4 },
+                        { backgroundColor: action.color, opacity: pressed ? 0.85 : 1 },
                       ]}
                       onPress={() => handleActionPress(action)}
                     >
@@ -296,18 +295,14 @@ export default function HomeScreen() {
                         style={{ marginBottom: 4 }}
                       />
                       <Text style={[styles.secondaryActionText, { color: action.textColor }]}>{action.label}</Text>
-                      {!autorizado && (
-                        <MaterialCommunityIcons name="lock" size={10} color={action.textColor} style={{ marginTop: 2 }} />
-                      )}
                     </Pressable>
-                  }
-                </>
+                  )}
+                </View>
               );
             })}
           </View>
         </ScrollView>
 
-        {/* ALERTA SLIM */}
         <View style={styles.alertCard}>
           <MaterialCommunityIcons name="alert-circle-outline" size={15} color="#b45309" style={{ marginTop: 1 }} />
           <View style={{ flex: 1 }}>
@@ -317,7 +312,6 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* SEÇÃO ÚLTIMAS ATIVIDADES - LIVE MONITOR */}
         <View style={styles.liveSectionHeader}>
           <View style={styles.liveBadge}>
             <Animated.View
@@ -389,7 +383,6 @@ export default function HomeScreen() {
             );
           })
         )}
-
       </ScrollView>
     </View>
   );
@@ -401,7 +394,6 @@ const styles = StyleSheet.create({
   headerTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   headerTitle: { fontSize: 18, fontWeight: '700', color: '#0f172a', letterSpacing: -0.3 },
   headerSubtitle: { color: '#64748b', fontSize: 12, marginTop: 2, fontWeight: '500' },
-  notificationIcon: { backgroundColor: '#f8fafc', padding: 8, borderRadius: 10, borderWidth: 1, borderColor: '#f1f5f9' },
   headerTimeContainer: { marginTop: 12, flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
   headerTime: { color: '#0f172a', fontSize: 24, fontWeight: '700', letterSpacing: -0.5 },
   headerDate: { color: '#64748b', fontSize: 11, fontWeight: '600' },
@@ -437,7 +429,9 @@ const styles = StyleSheet.create({
     padding: 8,
     height: 85,
     justifyContent: 'center',
-    alignItems: 'center', shadowColor: '#000', elevation: 5
+    alignItems: 'center', 
+    shadowColor: '#000', 
+    elevation: 5
   },
   secondaryActionText: { fontSize: 11, fontWeight: '700', textAlign: 'center', marginTop: 2 },
   alertCard: { backgroundColor: '#fffbeb', borderRadius: 12, padding: 10, marginTop: 16, borderWidth: 1, borderColor: '#fef3c7', flexDirection: 'row', gap: 8, alignItems: 'flex-start' },

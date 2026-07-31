@@ -1,9 +1,10 @@
-import React, { useState, useMemo, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, ActivityIndicator, TextInput } from 'react-native';
-import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useQuery } from '@tanstack/react-query';
 import { FlashList as ShopifyFlashList } from '@shopify/flash-list';
+import { useQuery } from '@tanstack/react-query';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Dimensions, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { armOcupadoApi } from '../../services/api';
 
 const FlashList = ShopifyFlashList as any;
@@ -30,7 +31,8 @@ const { width } = Dimensions.get('window');
 
 export default function ArmariosOcupadosScreen() {
   const router = useRouter();
-  const { filial, armarioId,numero } = useLocalSearchParams<{ filial: string; armarioId: string,numero:any }>();
+  const insets = useSafeAreaInsets(); // Pega o espaço exato da barra de status
+  const { filial, armarioId, numero } = useLocalSearchParams<{ filial: string; armarioId: string, numero: any }>();
   
   const [busca, setBusca] = useState('');
   const [estaPesquisando, setEstaPesquisando] = useState(false);
@@ -38,16 +40,14 @@ export default function ArmariosOcupadosScreen() {
   const listRef = useRef<any>(null);
   const [mostrarBotaoTopo, setMostrarBotaoTopo] = useState(false);
 
-  // Integração com React Query usando os parâmetros recebidos
   const { data: ocupadosData = [], isLoading, error } = useQuery<RegistroOcupado[]>({
     queryKey: ['ArmariosOcupados', filial, armarioId],
     queryFn: () => armOcupadoApi(Number(filial), Number(armarioId)),
     enabled: !!filial && !!armarioId,
     staleTime: 10000, 
-    refetchInterval: 15000, // Polling para manter o painel da portaria atualizado
+    refetchInterval: 15000,
   });
 
-  // Filtro inteligente por número da chave ou nome do colaborador
   const dadosFiltrados = useMemo(() => {
     let resultado = Array.isArray(ocupadosData) ? [...ocupadosData] : [];
 
@@ -60,7 +60,6 @@ export default function ArmariosOcupadosScreen() {
       );
     }
 
-    // Ordena pelo número da chave do armário
     return resultado.sort((a, b) => (a.armario?.chave || 0) - (b.armario?.chave || 0));
   }, [ocupadosData, busca]);
 
@@ -75,7 +74,7 @@ export default function ArmariosOcupadosScreen() {
         matricula: item.matriculaColaborador,
         setor: item.setor,
         filial: String(filial),
-        armarioId:item.armario?.amarioId
+        armarioId: item.armario?.amarioId
       },
     });
   }, [router, filial]);
@@ -89,7 +88,6 @@ export default function ArmariosOcupadosScreen() {
         onPress={() => irParaDetalhes(item)}
         activeOpacity={0.85}
       >
-        {/* Lado Esquerdo: Identificador de Chave Elevado */}
         <View style={styles.leftSection}>
           <View style={styles.chaveBadge}>
             <Text style={styles.chaveLabel}>Nº</Text>
@@ -97,7 +95,6 @@ export default function ArmariosOcupadosScreen() {
           </View>
         </View>
 
-        {/* Centro: Dados do Colaborador */}
         <View style={styles.infoSection}>
           <Text style={styles.colaboradorNome} numberOfLines={1}>
             {item.nomeColaborador}
@@ -112,7 +109,6 @@ export default function ArmariosOcupadosScreen() {
           <Text style={styles.tipoText}>{tipoFmt}</Text>
         </View>
 
-        {/* Lado Direito: Ação de Navegação */}
         <View style={styles.rightSection}>
           <MaterialCommunityIcons name="chevron-right" size={20} color="#94a3b8" />
         </View>
@@ -153,12 +149,25 @@ export default function ArmariosOcupadosScreen() {
     <View style={styles.container}>
       <Stack.Screen
         options={{
+          headerShown: true,
           headerStyle: { backgroundColor: '#f0f9ff' },
           headerTintColor: '#0f172a',
           headerTitleAlign: 'left',
           headerShadowVisible: false,
+          
+          // Joga o botão de voltar para baixo da notificação
+          headerLeft: () => (
+            <TouchableOpacity 
+              onPress={() => router.back()} 
+              style={[styles.backButton, { marginTop: insets.top }]}
+            >
+              <Ionicons name="arrow-back" size={22} color="#0f172a" />
+            </TouchableOpacity>
+          ),
+
+          // Joga o título para baixo da barra de notificações
           headerTitle: () => (
-            <View>
+            <View style={[styles.headerContainer, { marginTop: insets.top }]}>
               <Text style={styles.headerTitle}>Armários Ocupados</Text>
               <Text style={styles.headerSubtitle}>Bloco {armarioId} • Filial {filial}</Text>
             </View>
@@ -179,7 +188,6 @@ export default function ArmariosOcupadosScreen() {
         scrollEventThrottle={16}
         ListHeaderComponent={(
           <View style={styles.headerComponentContainer}>
-            {/* Barra de Busca Light */}
             <View style={[styles.searchContainer, estaPesquisando && styles.searchContainerFocused]}>
               <Ionicons name="search" size={20} color={estaPesquisando ? "#0a7ea4" : "#64748b"} style={styles.searchIcon} />
               <TextInput
@@ -234,6 +242,9 @@ const styles = StyleSheet.create({
   center: { justifyContent: 'center', alignItems: 'center', paddingVertical: 48 },
   loadingText: { color: '#64748b', marginTop: 12, fontSize: 14, textAlign: 'center' },
   errorText: { color: '#b91c1c', marginTop: 12, fontSize: 14, fontWeight: '600' },
+  
+  backButton: { marginRight: 15 },
+  headerContainer: { justifyContent: 'center' },
   headerTitle: { color: '#0f172a', fontSize: 18, fontWeight: '800' },
   headerSubtitle: { color: '#475569', fontSize: 13, marginTop: 2, fontWeight: '500' },
   

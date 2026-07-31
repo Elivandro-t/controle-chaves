@@ -4,7 +4,7 @@ export default function EntregarLayout() {
   return (
     <Stack
       screenOptions={{
-        headerShown: true,
+        headerShown: false,
       }}
     />
   );

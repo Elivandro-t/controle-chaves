@@ -13,7 +13,7 @@ import {
   View,
 } from 'react-native';
 // 👉 Importado para resolver o problema dos botões colados no bottom
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getUserId } from '@/services/storage';
 import { fetchUsuariosConsumer, submitEntregaChave } from '../../services/api';
@@ -129,7 +129,8 @@ export default function SelectConsumerScreen() {
   );
 
   return (
-    <View style={styles.page}>
+   <SafeAreaView style={[styles.page, { paddingBottom: insets.bottom }]}>
+         <View style={styles.page}>
       <Pressable style={styles.backButton} onPress={() => router.back()}>
         <MaterialCommunityIcons name="chevron-left" size={28} color="#0a7ea4" />
       </Pressable>
@@ -199,6 +200,7 @@ export default function SelectConsumerScreen() {
         </Pressable>
       </View>
     </View>
+   </SafeAreaView>
   );
 }
 

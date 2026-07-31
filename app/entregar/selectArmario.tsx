@@ -28,10 +28,11 @@ const { width } = Dimensions.get('window');
 export default function SelectArmarioScreen() {
   const router = useRouter();
   const navigation = useNavigation();
-  const params = useLocalSearchParams<{ tipoDevolucao?: string }>();
+  const params = useLocalSearchParams<{ tipoDevolucao?: string,totem:any }>();
   
   // Identifica se estamos no modo de devolução
   const isDevolucao = params.tipoDevolucao === "devolucao";
+  const isTotem = params.totem === "totem"
 
   const [selectedArmario, setSelectedArmario] = useState<ArmarioItem | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -99,6 +100,10 @@ export default function SelectArmarioScreen() {
   }, [armarios, searchQuery, isDevolucao]);
 
   const handleNextStep = async () => {
+    if(isTotem){
+       Alert.alert("Totem")
+      return;
+    }
     if (isDevolucao) {
       if (!selectedArmario) {
         Alert.alert('Atenção', 'Por favor, selecione um armário para devolver.');

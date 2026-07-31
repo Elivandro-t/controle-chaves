@@ -4,9 +4,12 @@ import { FlashList as ShopifyFlashList } from '@shopify/flash-list';
 import { useQuery } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Dimensions, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Dimensions, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { buscaBlocoArmario } from '../../services/api';
+
 const FlashList = ShopifyFlashList as any;
+
 interface ArmarioUnidade {
   id: number;
   chave: number;
@@ -18,16 +21,20 @@ interface ArmarioUnidade {
   armario: any;
   filial: number;
 }
+
 interface BlocoFilial {
   id: number;
   filial: number;
   tipo: string;
   bloco: ArmarioUnidade[];
 }
+
 const { width } = Dimensions.get('window');
+
 export default function ArmariosScreen() {
   const router = useRouter();
-  const { armarioId, tipo, filial,semVoltar  } = useLocalSearchParams<{ armarioId?: string; tipo?: string, filial: any,semVoltar:any }>();
+  const insets = useSafeAreaInsets(); // Pega o espaço exato da barra de notificações/status
+  const { armarioId, tipo, filial, semVoltar } = useLocalSearchParams<{ armarioId?: string; tipo?: string, filial: any, semVoltar: any }>();
   const [filialId, setFilialId] = useState<string | null>(filial);
   const [perfilUsuario] = useState<'admin' | 'operador'>('admin');
 
@@ -36,6 +43,9 @@ export default function ArmariosScreen() {
 
   const listRef = useRef<any>(null);
   const [mostrarBotaoTopo, setMostrarBotaoTopo] = useState(false);
+
+  // Altura total do header considerando a barra de status dinâmica do aparelho
+  const headerTotalHeight = 65 + insets.top;
 
   useEffect(() => {
     async function obterFilial() {
@@ -169,23 +179,63 @@ export default function ArmariosScreen() {
     );
   }
 
+  function handleNavigantionToInstallNewArmario(): void {
+    router.push({
+      pathname: '/entregar/createChaves' as any,
+      params: {
+        armarioId: String(armarioId),
+        filial: filial,
+        tipo: tipo
+      },
+    });
+  }
+
   return (
-    <View style={styles.container}>
+      <View style={styles.container}>
       <Stack.Screen
         options={{
-          headerStyle: { backgroundColor: '#f0f9ff' },
+          headerShown: true,
+          headerStyle: { 
+            backgroundColor: '#f0f9ff',
+            // Removido o 'height' daqui para evitar o erro do TypeScript
+          },
           headerTintColor: '#0f172a',
           headerTitleAlign: 'left',
           headerShadowVisible: false,
+          
+          headerLeft: () => {
+            if (semVoltar === "true") {
+              return null;
+            }
+            return (
+              <TouchableOpacity
+                style={[styles.backButton, { marginTop: insets.top }]}
+                onPress={() => router.canGoBack() ? router.back() : router.replace('/filial')}
+              >
+                <Ionicons name="arrow-back-circle-outline" size={32} color="#0f172a" />
+              </TouchableOpacity>
+            );
+          },
+
           headerTitle: () => (
-            <View>
+            <View style={[styles.headerContainer, { marginTop: insets.top }]}>
               <Text style={styles.headerTitle}>Painel de Controle</Text>
               <Text style={styles.headerSubtitle}>Filial {filialId} • {metricas.ocup} ocupados</Text>
+              {perfilUsuario === 'admin' && !estaPesquisando ? (
+                <TouchableOpacity
+                  style={styles.installButton}
+                  onPress={() => handleNavigantionToInstallNewArmario()}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.installIconCircle}>
+                    <Ionicons name="add" size={20} color="#0a7ea4" />
+                  </View>
+                </TouchableOpacity>
+              ) : null}
             </View>
           ),
         }}
       />
-
       <FlashList
         ref={listRef}
         data={armariosFiltradosEOrdenados}
@@ -255,20 +305,6 @@ export default function ArmariosScreen() {
             <Text style={[styles.loadingText, { marginTop: 8 }]}>Nenhum armário encontrado.</Text>
           </View>
         )}
-        ListFooterComponent={
-          perfilUsuario === 'admin' && !estaPesquisando ? (
-            <TouchableOpacity
-              style={styles.installButton}
-              onPress={() => Alert.alert('Aviso', 'Criar rota de POST na API para cadastrar armário')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.installIconCircle}>
-                <Ionicons name="add" size={20} color="#0a7ea4" />
-              </View>
-              <Text style={styles.installText}>Instalar Novo Armário</Text>
-            </TouchableOpacity>
-          ) : null
-        }
       />
 
       {mostrarBotaoTopo && (
@@ -281,6 +317,7 @@ export default function ArmariosScreen() {
         </TouchableOpacity>
       )}
     </View>
+    
   );
 }
 
@@ -355,22 +392,27 @@ const styles = StyleSheet.create({
   cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 8 },
   footerActionText: { fontSize: 10, color: '#64748b', fontWeight: '600', letterSpacing: 0.1 },
 
+  backButton: {
+    marginRight: 15,
+  },
+  headerContainer: {
+    justifyContent: 'center',
+    minWidth: 150,
+  },
+
   installButton: {
-    flex: 1,
-    height: 125,
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    height: 55,
     borderRadius: 12,
-    borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: '#cbd5e1',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 16,
-    marginHorizontal: 4
+    marginTop: 0,
+    marginBottom: 20,
+    marginHorizontal: 10,
+    position: "absolute",
+    right: 1
   },
   installIconCircle: { backgroundColor: '#e0f2fe', padding: 8, borderRadius: 50, marginBottom: 6 },
-  installText: { fontSize: 11, color: '#0a7ea4', fontWeight: '700', letterSpacing: 0.2 },
 
   fabTopo: {
     position: 'absolute',

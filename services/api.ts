@@ -4,7 +4,7 @@ import { Alert } from 'react-native';
 import { AUTH_TOKEN_KEY } from './storage';
 // eslint-disable-next-line import/no-named-as-default-member
 const api = axios.create({
-  baseURL: 'http://10.70.71.131:8080',
+  baseURL: 'http://10.70.70.166:8080',
   timeout: 12000,
 });
 // Callback executed when session expires (401/403)
@@ -35,18 +35,15 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const status = error.response?.status;
-    if (status === 403 && 500) {
-      if (onSessionExpired) {
-      }
-      const err = new Error('Sessão expirada. Faça login novamente.');
-      (err as any).code = 'SESSION_EXPIRED';
-      throw err;
+    if (status === 403 || status === 500) {
+      onSessionExpired?.();
+
+      return Promise.reject(error);
     }
-    if (status === 401) {
-      if (onSessionExpired) {
-      }
-      Alert.alert(error.response?.data?.message || 'Não autorizado. Faça login novamente.');
+    if(status === 401){
+      Alert.alert(error.response?.data?.message || 'Sessão expirada. Faça login novamente.');
     }
+
     throw error;
   }
 );
@@ -88,6 +85,14 @@ export async function fetchArmarios() {
     throw error;
   }
 }
+export async function ArmariosCreate(data:any) {
+  try {
+    const response = await api.post('/armario',data);
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+}
 export type EntregaChavePayload = {
   gmIDMatricula: string;
   numeroDaChave: number;
@@ -95,11 +100,18 @@ export type EntregaChavePayload = {
   usuarioId: number;
 };
 
+
+
 export async function submitEntregaChave(payload: EntregaChavePayload) {
-  console.log('Enviando dados para entrega de chave:', payload);
   const response = await api.post('/entregaChaves', payload);
   return response.data;
 }
+
+export async function submitEntregaChaveTotem(payload: EntregaChavePayload) {
+  const response = await api.post('/entregaChaves/devolucao/token', payload);
+  return response.data;
+}
+
 
 export type UsuarioConsumer = {
   id?: number;
@@ -118,7 +130,6 @@ export async function fetchUsuariosConsumer() {
 }
 
 export async function createUsuarioConsumer(data: UsuarioConsumer) {
-  console.log('Enviando dados para criação do usuário consumer:', data);
     console.log('Buscando usuários consumer... '+ data.imagemFacial);
 
   const response = await api.post<UsuarioConsumer>('/consumer', data);
@@ -130,7 +141,7 @@ export type CriarChavesPayload = {
   quantidade: number;
 };
 
-export async function createArmarioChaves(payload: CriarChavesPayload) {
+export async function createArmarioChaves(payload: any) {
   const response = await api.post('/armario/chaves', payload);
   return response.data;
 }
@@ -171,9 +182,7 @@ export async function ArmariodTop3UltimosEntregue(filial: any) {
 }
 
 export async function detalhesArmario(filial: any, armarioId: number, chaveNumero: any) {
-  console.log('api armárioId:', armarioId, 'chaveNumero:', chaveNumero, 'filial:', filial);
   const response = await api.get(`entregaChaves/detalhes/arm/${armarioId}/chave/${chaveNumero}/filial/${filial}`);
-  console.log('Resposta da API detalhesArmario:', response.data);
   return response.data;
 }
 
@@ -185,3 +194,5 @@ export async function armOcupadoApi(filial: any, arm: any) {
   const response = await api.get('/entregaChaves/ocupados/arm/filial', { params });
   return response.data;
 }   
+
+

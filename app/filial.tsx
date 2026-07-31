@@ -6,7 +6,6 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { filiaisPermitidas, setOnSessionExpired } from '../services/api';
 import { clearAuthStorage, getUserId } from '../services/storage';
 import { showError } from '../services/toast';
-
 export default function FilialScreen() {
   const [loadingFilial, setLoadingFilial] = useState(false);
   const [loading, setLoading] = useState(true);

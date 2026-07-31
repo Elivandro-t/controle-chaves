@@ -45,6 +45,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     padding: 24,
     backgroundColor: '#eef2ff',
+    
   },
   container: {
     padding: 24,

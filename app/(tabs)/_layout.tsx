@@ -7,21 +7,21 @@ export default function TabLayout() {
       <Tabs
       screenOptions={{
         headerShown: false,
+        tabBarHideOnKeyboard: true,
         // Cor do ícone/texto quando selecionado (Azul Tech Corporativo)
-        tabBarActiveTintColor: '#0284c7',
+        tabBarActiveTintColor: '#265d79',
         // Cor do ícone/texto quando inativo (Cinza sutil)
         tabBarInactiveTintColor: '#94a3b8',
-
         // Estilização da barra de navegação inferior (Estilo Asian Minimalist)
         tabBarStyle: {
-          backgroundColor: '#ffffff', // Fundo branco puro para sumir com o Dark Mode
-          borderTopWidth: 1,
-          borderTopColor: '#f1f5f9', // Linha superior quase invisível
-          height: 120, // Altura mais elegante e menos "gorda"
-          paddingBottom: 10,
-          paddingTop: 8,
-          elevation: 0, // Remove sombra pesada no Android
-          shadowOpacity: 0, // Remove sombra no iOS
+           backgroundColor: '#fff',
+  borderTopWidth: 1,
+  borderTopColor: '#f1f5f9',
+  height: 70,
+  paddingTop: 4,
+  paddingBottom: 8,
+  elevation: 0,
+  shadowOpacity: 0,// Remove sombra no iOS
         },
         // Estilo dos textos (Fontes menores e mais "clean")
         tabBarLabelStyle: {

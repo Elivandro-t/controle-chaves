@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useIsFocused } from '@react-navigation/native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useNavigation, useRouter } from 'expo-router';
@@ -14,10 +15,16 @@ export default function EntregarScreen() {
   const [isTabsHidden, setIsTabsHidden] = useState(true);
   const cameraRef = useRef(null);
   const [permission, requestPermission] = useCameraPermissions();
-
+  const [Arm,setSelectedArm]=useState<any>("")
   const scanLineAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    const loadData = async () => {
+        const data = await AsyncStorage.getItem("selectedArm");
+        if (data) setSelectedArm(JSON.parse(data));
+      
+    };
+    loadData();
     requestPermission();
   }, [requestPermission]);
 
@@ -59,7 +66,7 @@ export default function EntregarScreen() {
     try {
       const json = JSON.parse(data);
 
-      if (!json.chave || !json.arm) {
+      if (!json.chave || !json.chave) {
         throw new Error('Invalido');
       }
 
@@ -67,7 +74,7 @@ export default function EntregarScreen() {
         pathname: '/entregar/detalhesFacialItens',
         params: { 
           numeroDaChave: json.chave.toString(),
-          armarioId: json.arm.toString(),
+          armarioId: Arm?.armarioId,
           tipoSelecionado: "totem"
         },
       });
@@ -127,7 +134,7 @@ export default function EntregarScreen() {
                 ref={cameraRef}
                 style={StyleSheet.absoluteFillObject}
                 onBarcodeScanned={scanned ? undefined : handleBarcodeScanned}
-                facing="front"
+                facing="back"
                 barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
               >
                 <View style={styles.maskContainer}>
@@ -167,14 +174,21 @@ export default function EntregarScreen() {
         </View>
 
         {/* 🖐️ CARD 2: SELEÇÃO MANUAL */}
-        <Pressable
+        {/**
+         * <Pressable
           style={styles.secondaryCard}
-          onPress={() => router.push('/entregar/manual')}
+          onPress={() => router.push({
+            pathname:"/entregar/selectArmario",params:{
+              totem:"totem"
+            }
+          })}
         >
           <MaterialCommunityIcons name="magnify" size={48} color="#0a7ea4" />
           <Text style={[styles.optionTitle, styles.secondaryText]}>Selecionar Manualmente</Text>
           <Text style={[styles.optionSubtitle, styles.secondaryText]}>Filial → Armário → Chave</Text>
         </Pressable>
+         * 
+         */}
       </View>
     </ScrollView>
   );
@@ -183,6 +197,7 @@ export default function EntregarScreen() {
 const styles = StyleSheet.create({
   page: {
     flexGrow: 1,
+    marginVertical:40,
     backgroundColor: '#eef2ff',
   },
   container: {

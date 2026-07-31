@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
@@ -9,11 +10,17 @@ export default function EntregarQRCodeScreen() {
   const [scanned, setScanned] = useState(false);
   const cameraRef = useRef(null);
   const [permission, requestPermission] = useCameraPermissions();
-
+   const [arm,setSelectedArm]=useState<any>("")
   // Animação da linha de scanner (Laser)
   const scanLineAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    const loadData = async () => {
+        const data = await AsyncStorage.getItem("selectedArm");
+        if (data) setSelectedArm(JSON.parse(data));
+      
+    };
+    loadData();
     requestPermission();
   }, [requestPermission]);
 
@@ -49,7 +56,7 @@ export default function EntregarQRCodeScreen() {
       // 🛡️ Tenta fazer o parse seguro do QR Code
       const json = JSON.parse(data);
 
-      if (!json.chave || !json.arm) {
+      if (!json.chave || !json.chave) {
         throw new Error('QR Code inválido para este fluxo');
       }
 
@@ -58,7 +65,7 @@ export default function EntregarQRCodeScreen() {
                   pathname: '/entregar/detalhesFacialItens',
                   params: { 
                     numeroDaChave: json.chave.toString(),
-                    armarioId: json.arm.toString(), // Corrigido de 'arnarioId'
+                    armarioId: arm?.armarioId, // Corrigido de 'arnarioId'
                   },
                 });
               

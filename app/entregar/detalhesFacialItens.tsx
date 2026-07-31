@@ -15,7 +15,7 @@ import {
   Text,
   View
 } from 'react-native';
-import { detlhesFacial, submitEntregaChave } from '../../services/api';
+import { detlhesFacial, submitEntregaChave, submitEntregaChaveTotem } from '../../services/api';
 
 const { width } = Dimensions.get('window');
 
@@ -34,11 +34,11 @@ export default function DetalhesFacialItens() {
   const timerRef = useRef<NodeJS.Timeout | any>(null);
 
   const createMutation = useMutation({
-    mutationFn: submitEntregaChave,
-    onSuccess: () => {
+    mutationFn: params.tipoSelecionado === "totem"?submitEntregaChaveTotem: submitEntregaChave,
+    onSuccess: (data:any) => {
       setFeedbackMessage({
         type: 'success',
-        text: `Chave número ${params.numeroDaChave} entregue com sucesso!`,
+        text: data.msg,
       });
       queryClient.invalidateQueries({ queryKey: ['armariosgg'] });
       queryClient.invalidateQueries({ queryKey: ['ArmarioUnicoggg'] });
@@ -50,7 +50,7 @@ export default function DetalhesFacialItens() {
         } else {
           router.replace('/entregar');
         }
-      }, 1500);
+      }, 5000);
     },
     onError: (error: any) => {
       const errorMsg = error?.message || 'Falha na comunicação com o servidor.';

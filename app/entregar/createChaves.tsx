@@ -1,3 +1,6 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useQuery } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -7,13 +10,12 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-import { fetchArmarios, createArmarioChaves } from '../../services/api';
+import SelecaoModal from '@/components/SelecaoModal';
+import { createArmarioChaves, fetchArmarios } from '../../services/api';
 import { getSelectedFilial } from '../../services/storage';
 
 type ArmarioItem = {
@@ -31,7 +33,7 @@ type ArmarioItem = {
 export default function CreateArmarioChavesScreen() {
   const router = useRouter();
   const [filial, setFilial] = useState<number | null>(null);
-  const [selectedArmario, setSelectedArmario] = useState<ArmarioItem | null>(null);
+  const [selectedArmario, setSelectedArmario] = useState<any | null>(null);
   const [quantidade, setQuantidade] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -44,15 +46,15 @@ export default function CreateArmarioChavesScreen() {
     queryFn: async () => {
       const data = await fetchArmarios();
       const filtered = data.filter((item) => item.filial === filial);
-      const allBlocos: ArmarioItem[] = [];
+      const allBlocos: any[] = [];
       filtered.forEach((group) => {
-        allBlocos.push(...group.bloco);
+        allBlocos.push(group);
       });
+    
       return allBlocos;
     },
     enabled: filial !== null,
   });
-
   const armarios = armariosQuery.data ?? [];
 
   const handleSubmit = async () => {
@@ -61,20 +63,14 @@ export default function CreateArmarioChavesScreen() {
       return;
     }
 
-    const qty = parseInt(quantidade);
-    if (isNaN(qty) || qty < 1) {
-      Alert.alert('Erro', 'Quantidade deve ser um número maior que 0');
-      return;
-    }
-
     setLoading(true);
     try {
       await createArmarioChaves({
-        armarioId: selectedArmario.id,
-        quantidade: qty,
+        amarioId: selectedArmario?.id,
+        quantidade: Number(quantidade),
       });
 
-      Alert.alert('Sucesso', `${qty} chave(s) adicionada(s) ao armário ${selectedArmario.numero}!`, [
+      Alert.alert('Sucesso', `${quantidade} chave(s) adicionada(s) ao armário ${selectedArmario.numero}!`, [
         {
           text: 'OK',
           onPress: () => {
@@ -85,31 +81,38 @@ export default function CreateArmarioChavesScreen() {
         },
       ]);
     } catch (error) {
-      Alert.alert('Erro', 'Falha ao criar chaves para o armário');
+
       console.error('Create chaves error:', error);
     } finally {
       setLoading(false);
     }
   };
+  const [open,setOpen]=useState(false)
+  const handleCreateArm = ()=>{
+     setOpen(true)
+  }
+const handleOnClose = ()=>{
+       setOpen(false)
 
-  const renderArmario = ({ item }: { item: ArmarioItem }) => (
+}
+  const renderArmario = ({ item }: { item: any }) => (
     <Pressable
       style={[
         styles.armarioCard,
-        selectedArmario?.id === item.id && styles.selectedCard,
+        selectedArmario?.armarioId === item.id && styles.selectedCard,
       ]}
       onPress={() => setSelectedArmario(item)}
     >
       <View style={styles.armarioContent}>
         <Text style={styles.armarioType}>
-          {item.armario.tipo.replace('_', ' ').toUpperCase()}
+          {item?.tipo.replace('_', ' ').toUpperCase()}
         </Text>
-        <Text style={styles.armarioNumber}>Armário {item.numero}</Text>
+        <Text style={styles.armarioNumber}>{item?.tipo.replace('_', ' ').toUpperCase()}</Text>
         <Text style={styles.armarioStatus}>
           {item.disponivel ? '✓ LIVRE' : '✗ ' + item.status}
         </Text>
       </View>
-      {selectedArmario?.id === item.id && (
+      {selectedArmario?.armarioId === item.armarioId && (
         <MaterialCommunityIcons name="check-circle" size={24} color="#0a7ea4" />
       )}
     </Pressable>
@@ -121,11 +124,25 @@ export default function CreateArmarioChavesScreen() {
         <MaterialCommunityIcons name="chevron-left" size={28} color="#0a7ea4" />
       </Pressable>
 
-      <View style={styles.header}>
-        <Text style={styles.title}>Cadastrar Chaves ao Armário</Text>
-        <Text style={styles.subtitle}>
-          Adicione chaves (blocos) aos armários
-        </Text>
+      <View style={styles.headerSideBar}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Cadastrar Chaves ao Armário</Text>
+          <Text style={styles.subtitle}>
+            Adicione chaves (blocos) aos armários
+          </Text>
+        </View>
+        <TouchableOpacity
+         
+          onPress={() => handleCreateArm()}
+          disabled={open}
+        >
+          {open ? (
+            <ActivityIndicator color="#ffffff" />
+          ) : (
+            <Text  style={styles.buttonSideBar
+          }>Novo</Text>
+          )}
+        </TouchableOpacity>
       </View>
 
       {armariosQuery.isLoading ? (
@@ -143,7 +160,7 @@ export default function CreateArmarioChavesScreen() {
           <FlatList
             data={armarios}
             renderItem={renderArmario}
-            keyExtractor={(item) => item.id.toString()}
+            keyExtractor={(item) => item?.amarioId?.toString()}
             contentContainerStyle={styles.listContent}
             scrollEnabled={false}
           />
@@ -154,7 +171,7 @@ export default function CreateArmarioChavesScreen() {
               <View style={styles.form}>
                 <View style={styles.field}>
                   <Text style={styles.label}>
-                    Quantas chaves adicionar ao Armário {selectedArmario.numero}?
+                    Quantas chaves adicionar ao Armário {selectedArmario.armarioId}?
                   </Text>
                   <TextInput
                     style={styles.input}
@@ -194,6 +211,7 @@ export default function CreateArmarioChavesScreen() {
           )}
         </>
       )}
+      {open && <SelecaoModal visible={open} onClose={handleOnClose} onSubmit={handleCreateArm}/>}
     </View>
   );
 }
@@ -281,7 +299,7 @@ const styles = StyleSheet.create({
   },
   formContainer: {
     paddingHorizontal: 16,
-    paddingVertical: 20,
+    paddingVertical: 50,
     borderTopWidth: 1,
     borderTopColor: '#e2e8f0',
   },
@@ -309,13 +327,13 @@ const styles = StyleSheet.create({
   buttonRow: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 12,
+    marginTop: 10,
   },
   button: {
     flex: 1,
     backgroundColor: '#0a7ea4',
     borderRadius: 12,
-    paddingVertical: 12,
+    paddingVertical: 10,
     alignItems: 'center',
   },
   cancelButton: {
@@ -335,4 +353,12 @@ const styles = StyleSheet.create({
     color: '#64748b',
     fontSize: 15,
   },
+  headerSideBar: {
+    display: 'flex',
+    flexDirection: 'row',
+  },
+  buttonSideBar: {
+    color: '#0a7ea4',
+    justifyContent:'center'
+  }
 });

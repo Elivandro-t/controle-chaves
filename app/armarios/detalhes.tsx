@@ -12,12 +12,14 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getUserId } from '../../services/storage';
 
 export default function DetalhesArmarioScreen() {
   const router = useRouter();
   const [userId, setUserId] = useState<string>('2');
   const [processandoDevolucao, setProcessandoDevolucao] = useState(false);
+  const insets = useSafeAreaInsets(); // Pega a altura exata da barra de status
 
   // Mantida a desestruturação alinhada com os tipos originais
   const { numero, usuario, armarioId, filial } = useLocalSearchParams<{
@@ -49,15 +51,13 @@ export default function DetalhesArmarioScreen() {
     queryFn: () => detalhesArmario(Number(filial), Number(armarioIdNumero), numero),
     enabled: !!numero && !!armarioIdNumero && !!filial,
   });
-  console.log(data)
+
   async function handleDevolverChave() {
-    console.log("data " + armarioId + " " + numero)
     if (!armarioId || !numero) {
       Alert.alert('Atenção', 'Dados do armário insuficientes para prosseguir.');
       return;
     }
 
-    // Popup de confirmação para liberação da chave
     Alert.alert(
       'Liberar Chave',
       'Deseja realmente liberar a chave do colaborador?',
@@ -80,13 +80,10 @@ export default function DetalhesArmarioScreen() {
                 },
               };
 
-              console.log("itens faltando +" + JSON.stringify(payload))
-
               const response = await devolverChave(payload);
 
               if (response) {
                 Alert.alert('Sucesso', 'Chave devolvida com sucesso!');
-                // Redirecionamento para a rota solicitada
                 router.replace('/armarios/ocupados');
               }
             } catch (error: any) {
@@ -101,16 +98,18 @@ export default function DetalhesArmarioScreen() {
       { cancelable: true }
     );
   }
- const handleEntregaChave = ()=>{
-              router.push({
-        pathname: '/entregar/selectConsumer',
-        params: {
-          armarioId: Number(armarioIdNumero || 0),
-          numeroDaChave: numero,
-          tipoSelecionado:"entregaManual"
-        },
-      });
- }
+
+  const handleEntregaChave = () => {
+    router.push({
+      pathname: '/entregar/selectConsumer',
+      params: {
+        armarioId: Number(armarioIdNumero || 0),
+        numeroDaChave: numero,
+        tipoSelecionado: "entregaManual"
+      },
+    });
+  };
+
   if (isLoading) {
     return (
       <View style={[styles.container, styles.center]}>
@@ -128,19 +127,30 @@ export default function DetalhesArmarioScreen() {
     <View style={styles.container}>
       <Stack.Screen
         options={{
+          headerShown: true,
           headerStyle: { backgroundColor: '#f0f9ff' },
           headerTintColor: '#0f172a',
           headerTitleAlign: 'left',
-          headerTitle: 'Detalhes do Armário',
           headerShadowVisible: false,
+          
+          // Joga o botão de voltar para baixo da barra de notificações
           headerLeft: () => (
-            <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 12 }}>
-              <Ionicons name="arrow-back" size={24} color="#0f172a" />
+            <TouchableOpacity 
+              onPress={() => router.back()} 
+              style={[styles.backButton, { marginTop: insets.top }]}
+            >
+              <Ionicons name="arrow-back" size={22} color="#0f172a" />
             </TouchableOpacity>
+          ),
+
+          // Joga o título para baixo da barra de notificações
+          headerTitle: () => (
+            <View style={[styles.headerTitleContainer, { marginTop: insets.top }]}>
+              <Text style={styles.headerTitleText}>Detalhes do Armário</Text>
+            </View>
           ),
         }}
       />
-
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
         {/* CARD PRINCIPAL */}
@@ -153,7 +163,6 @@ export default function DetalhesArmarioScreen() {
                 color={corStatus}
               />
             </View>
-
             <View style={styles.titleWrapper}>
               <Text style={styles.mainTitle}>Armário {data?.armario?.chave || numero}</Text>
               <Text style={styles.subtitle}>{data?.armario?.tipo ? data.armario.tipo.replace('_', ' ') : 'NÃO ESPECIFICADO'}</Text>
@@ -172,7 +181,6 @@ export default function DetalhesArmarioScreen() {
 
         {!disponivel ? (
           <View style={styles.colaboradorCard}>
-            {/* HEADER DO CRACHÁ */}
             <View style={styles.colaboradorHeader}>
               <View style={styles.avatarContainer}>
                 <MaterialCommunityIcons name="account-circle" size={32} color="#0a7ea4" />
@@ -185,10 +193,8 @@ export default function DetalhesArmarioScreen() {
                 </Text>
               </View>
             </View>
-
             <View style={styles.cardDivider} />
-
-            {/* GRID DE INFORMAÇÕES */}
+            
             <View style={styles.infoGrid}>
               <View style={styles.gridItem}>
                 <View style={styles.iconLabelRow}>
@@ -207,7 +213,6 @@ export default function DetalhesArmarioScreen() {
               </View>
             </View>
 
-            {/* FOOTER AUDITORIA */}
             <View style={styles.colaboradorFooter}>
               <View style={styles.footerLeft}>
                 <MaterialCommunityIcons name="shield-check" size={14} color="#15803d" />
@@ -219,7 +224,6 @@ export default function DetalhesArmarioScreen() {
             </View>
           </View>
         ) : (
-          /* ESTADO VAZIO PREMIUM */
           <View style={styles.emptyStateCard}>
             <View style={styles.emptyIconCircle}>
               <MaterialCommunityIcons name="key-link" size={28} color="#15803d" />
@@ -230,33 +234,27 @@ export default function DetalhesArmarioScreen() {
             </Text>
           </View>
         )}
-         {
-          disponivel &&
-            <TouchableOpacity
+
+        {disponivel && (
+          <TouchableOpacity
             style={styles.btnDevolver}
-            onPress={()=>{
+            onPress={() => {
               Alert.alert('Devolver Chave', 
-              'Deseja realmente entregar a chave do armário?', 
-              [
-                { text: 'Cancelar', style: 'cancel' },
-                { text: 'Sim', onPress:handleEntregaChave }
-              ]
-            )
+                'Deseja realmente entregar a chave do armário?', 
+                [
+                  { text: 'Cancelar', style: 'cancel' },
+                  { text: 'Sim', onPress: handleEntregaChave }
+                ]
+              );
             }}
             disabled={!disponivel}
             activeOpacity={0.8}
           >
-            {!disponivel ? (
-              <ActivityIndicator size="small" color="#ffffff" />
-            ) : (
-              <>
-                <MaterialCommunityIcons name="lock-reset" size={22} color="#ffffff" />
-                <Text style={styles.btnDevolverText}>Entregar CHAVE</Text>
-              </>
-            )}
+            <MaterialCommunityIcons name="lock-reset" size={22} color="#ffffff" />
+            <Text style={styles.btnDevolverText}>Entregar CHAVE</Text>
           </TouchableOpacity>
-         }
-        {/* Botão de Devolução Direto (Visível somente se ocupado) */}
+        )}
+
         {!disponivel && (
           <TouchableOpacity
             style={styles.btnDevolver}
@@ -275,7 +273,6 @@ export default function DetalhesArmarioScreen() {
           </TouchableOpacity>
         )}
 
-        {/* LOGO DE ASSINATURA INFERIOR */}
         <View style={styles.footerLogoContainer}>
           <MaterialCommunityIcons name="security-network" size={36} color="#94a3b8" />
           <Text style={styles.footerLogoText}>CONTROLE DE PORTARIA</Text>
@@ -289,7 +286,7 @@ export default function DetalhesArmarioScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f0f9ff',
+    backgroundColor: '#f0f9ff'
   },
   center: {
     flex: 1,
@@ -298,7 +295,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 40,
+    paddingBottom: 10,
   },
   mainCard: {
     backgroundColor: '#ffffff',
@@ -324,6 +321,17 @@ const styles = StyleSheet.create({
   },
   titleWrapper: {
     flex: 1,
+  },
+  backButton: {
+    marginRight: 15,
+  },
+  headerTitleContainer: {
+    justifyContent: 'center',
+  },
+  headerTitleText: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#0f172a',
   },
   mainTitle: {
     fontSize: 22,

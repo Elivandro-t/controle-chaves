@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery } from '@tanstack/react-query';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import LockerCard from './LockerCard';
 import { armariosFiliais } from '../../services/api';
+import LockerCard from './LockerCard';
 
 interface ArmarioUnidade {
   id: number;
@@ -154,7 +154,7 @@ export default function Index() {
           title: `Filial ${filialId}`,
           headerStyle: { backgroundColor: '#f0f9ff' },
           headerTintColor: '#0f172a',
-          headerShadowVisible: false,
+          headerShadowVisible: false
         }}
       />
 
